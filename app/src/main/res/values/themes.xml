@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Change the parent to a Theme.AppCompat theme -->
+    <style name="Theme.Kapi_n86" parent="Theme.AppCompat.Light.NoActionBar">
+        <!-- Add your custom styling here -->
+    </style>
+</resources>
