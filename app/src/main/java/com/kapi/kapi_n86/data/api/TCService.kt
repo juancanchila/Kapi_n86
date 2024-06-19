@@ -40,10 +40,35 @@ import com.credibanco.demosdk.util.TYPEFACE_DEFAULT
 import com.google.android.material.snackbar.Snackbar
 import com.kapi.kapi_n86.data.model.TransactionResponse
 import kotlinx.coroutines.*
+import com.credibanco.demosdk.util.SubExtraInfoDto
+import com.credibanco.demosdk.util.RESULT_QR_SELL_CODE
+import androidx.appcompat.app.AlertDialog
+import android.widget.EditText
 
  class TCService(private val context: Context) : ResultIntegrationSDK {
-
+     private var ultimoIdTransaccion: Int? = null
+     private var ultimoMessage: String? = null
     private val authService = AuthenticationService(context)
+
+
+     fun setUltimoIdTransaccion(id: Int) {
+         ultimoIdTransaccion = id
+     }
+
+     fun setUltimoMessage(id: String) {
+         ultimoMessage = id
+     }
+     fun getUltimoMessage(): String? {
+         return ultimoMessage
+     }
+
+     // Método para obtener el último ID de transacción almacenado
+     fun getUltimoIdTransaccion(): Int? {
+         return ultimoIdTransaccion
+     }
+     fun clearUltimoIdTransaccion() {
+         ultimoIdTransaccion = null
+     }
     private val client = HttpClient() {
         install(JsonFeature) {
             serializer = GsonSerializer()
@@ -65,6 +90,9 @@ import kotlinx.coroutines.*
 
     override fun resultActivity(activityResult: ActivityResult) {
         Log.d("NFCService", "Evaluando la respuesta: ${activityResult.resultCode}")
+
+
+
 
         if (activityResult.resultCode == RESULT_SELL_CODE) {
 
@@ -139,13 +167,146 @@ import kotlinx.coroutines.*
                 }
             }
         }
+        when (activityResult.resultCode) {
+            RESULT_QR_SELL_CODE-> {
 
+                val bundle = activityResult.data?.extras
+                bundle?.let { bundleIt ->
+                    val autorizationCode: String? = bundleIt.getString(AUTORIZATION_SELL_APPROVED)
+                    val monto: String? = bundleIt.getString(TOTAL_AMOUNT_APROVED)
+                    val iva: String? = bundleIt.getString(IVA_TO_PRINT)
+                    val receipt: String? = bundleIt.getString(RECEIPT_TO_PRINT)
+                    val rrn: String? = bundleIt.getString(RRN_TO_PRINT)
+                    val terminalId: String? = bundleIt.getString(TERMINAL_ID)
+                    val timeDate: String? = bundleIt.getString(TIMEDATE_TO_PRINT)
+                    val responseCode: String? = bundleIt.getString(RESPONSE_CODE)
+                    val franchise: String? = bundleIt.getString(FRANCHISE_TO_PRINT)
+                    val accountType: String? = bundleIt.getString(ACCTYPE_TO_PRINT)
+                    val quotas: String? = bundleIt.getString(QUOTAS_TO_PRINT)
+                    val lastFourDigitsCard: String? = bundleIt.getString(LAST4_TO_PRINT)
+                    val merchantPosId: String? = bundleIt.getString(MERCHANT_POS_ID)
+
+
+
+
+                    Log.d("Numero de compra", "Numero de compra: $numeroDeCompra")
+                    ultimoRecibo = receipt
+                    val transactionResultResponse = TransactionResultData(
+                        status = null,
+                        facturaId = null,
+                        transaccionId = null,
+                        errorMessage = null,
+                        receipt = receipt
+                    )
+
+                    val sendResult = TransactionResultChannel.trySend(transactionResultResponse)
+                    if (sendResult.isSuccess) {
+                        Log.d("Transaction", "Transaction result sent successfully.")
+                    } else {
+                        Log.e("Transaction", "Failed to send transaction result.")
+                    }
+                    Log.d("Resultado de la compra", "Código de autorización: $autorizationCode")
+                    Log.d("Resultado de la compra", "Monto: $monto")
+                    Log.d("Resultado de la compra", "IVA: $iva")
+                    Log.d("Resultado de la compra", "Recibo: $receipt")
+                    Log.d("Resultado de la compra", "RRN: $rrn")
+                    Log.d("Resultado de la compra", "ID del terminal: $terminalId")
+                    Log.d("Resultado de la compra", "Fecha y hora: $timeDate")
+                    Log.d("Resultado de la compra", "Código de respuesta: $responseCode")
+                    Log.d("Resultado de la compra", "Franquicia: $franchise")
+                    Log.d("Resultado de la compra", "Tipo de cuenta: $accountType")
+                    Log.d("Resultado de la compra", "Cuotas: $quotas")
+                    Log.d("Resultado de la compra", "Últimos cuatro dígitos de la tarjeta: $lastFourDigitsCard")
+                    Log.d("Resultado de la compra", "ID del POS del comerciante: $merchantPosId")
+                }
+
+            }
+
+            QR_REJECTED -> {
+                val bundle = activityResult.data?.extras
+                if (bundle != null) {
+                    val apiResult = bundle.getString(API_RESULT)
+                    Log.d("TAG-1", "apiResult $apiResult")
+                }
+            }
+
+            QR_ERROR_CODE -> {
+                val bundle = activityResult.data?.extras
+                if (bundle != null) {
+                    val apiResult = bundle.getString(API_RESULT)
+                    Log.d("TAG-1", "apiResult $apiResult")
+                }
+            }
+
+        }
 
 
 
 
     }
 
+     suspend fun recargaQR(
+         uidExterno: String,
+         uidInterno: String,
+         amount: Int
+     ): Deferred<String?> = coroutineScope {
+         async(Dispatchers.IO) {
+             val compra = crearCompraTC(uidExterno, uidInterno, amount)
+
+
+             if (compra != null) {
+                 numeroDeCompra = compra[1]
+
+                 startSellQR(
+                     context,
+                     amount.toString(),
+                     "0",
+                     "0",
+                     "0",
+
+                     compra[1].toString()
+                 )
+
+                 val transactionResult = TransactionResultChannel.receive()
+                 // El recibo estará en la propiedad 'receipt' del objeto TransactionResult
+                 val receipt = transactionResult.receipt
+                 Log.e("Service", "Datos de la factura consultada para completar: ${receipt}")
+
+
+                 /**
+                  * El entorno de pruebas esta esperando 2 como id de trsaccion
+                  * perod e sdebe enviar como se muestra a continuación
+                  *   //  val transactionResponse = consultarCompraPorToken(compra[1].toInt())
+                  */
+
+
+                 val transactionResponse_result =  consultarCompraPorToken(compra[1].toInt())
+                 Log.e("Service", "Datos de la factura consultada para completar: ${transactionResponse_result}")
+
+                 //Completar
+                 //Imprimir
+
+                 if (transactionResponse_result == "PENDING") {
+                     // Llamar a completarCompraTC y luego a imprimirTransaccion
+                     val completarCompraResultado = completarCompraTC(compra[1].toInt())
+                     Log.e("Service", "Respuesta completar completar: ${completarCompraResultado}")
+                     return@async "0"
+                 } else {
+                     // Llamar a startAnnulment enviando compra[1]
+                     startAnnulment(context,compra[1])
+                     // Aquí debes decidir qué valor quieres devolver en este caso,
+                     // ya que no puedo determinar exactamente qué debería ser.
+                     // Podrías devolver un valor predeterminado o lanzar una excepción.
+                     return@async "-1"
+                 }
+
+
+             } else {
+                 // Mostrar un pop-up o mensaje indicando que el servicio no está disponible
+                 return@async "-1"
+             }
+         }
+     }
 
 
     suspend fun recargaTC(
@@ -181,19 +342,18 @@ import kotlinx.coroutines.*
                  */
 
 
-                val transactionResponse_result =  consultarCompraPorToken(2)
+
+                val transactionResponse_result =  consultarCompraPorToken(compra[1].toInt())
                 Log.e("Service", "Datos de la factura consultada para completar: ${transactionResponse_result}")
 
                 //Completar
                 //Imprimir
 
 
-
-                if (transactionResponse_result == "APPROVED") {
+                if (transactionResponse_result == "PENDING") {
                     // Llamar a completarCompraTC y luego a imprimirTransaccion
-                    //  val completarCompraResultado = completarCompraTC(2)
-                    //  imprimirTransaccion( )
-
+                    val completarCompraResultado = completarCompraTC(compra[1].toInt())
+                    Log.e("Service", "Respuesta completar completar: ${completarCompraResultado}")
                     return@async "0"
                 } else {
                     // Llamar a startAnnulment enviando compra[1]
@@ -230,7 +390,9 @@ import kotlinx.coroutines.*
         amount: Int
     ): Deferred<String?> = coroutineScope {
         async(Dispatchers.IO) {
+
             val compra = crearCompraTC(uidExterno, uidInterno, amount)
+
 
             if (compra != null) {
                 numeroDeCompra = compra[1]
@@ -257,19 +419,18 @@ import kotlinx.coroutines.*
                  */
 
 
-                val transactionResponse_result =  consultarCompraPorToken(2)
+                val transactionResponse_result =  consultarCompraPorToken(compra[1].toInt())
                 Log.e("Service", "Datos de la factura consultada para completar: ${transactionResponse_result}")
 
                 //Completar
                 //Imprimir
 
-
-
-                if (transactionResponse_result == "APPROVED") {
+                if (transactionResponse_result == "PENDING") {
                     // Llamar a completarCompraTC y luego a imprimirTransaccion
-                  //  val completarCompraResultado = completarCompraTC(2)
-                  //  imprimirTransaccion( )
+                 val completarCompraResultado = completarCompraTC(compra[1].toInt())
 
+
+                  //  imprimirTransaccion( )
                     return@async "0"
                 } else {
                     // Llamar a startAnnulment enviando compra[1]
@@ -287,13 +448,14 @@ import kotlinx.coroutines.*
             }
         }
     }
+     /*
     suspend fun RecargaQR(
         uidExterno: String,
         uidInterno: String,
         amount: Int
     ): String = withContext(Dispatchers.IO) {
         return@withContext "0007"
-    }
+    }*/
     suspend fun calculateMinValue(): String = withContext(Dispatchers.IO) {
         // Simplemente devuelve "0004" como número de transacción
         return@withContext "00070"
@@ -316,6 +478,8 @@ import kotlinx.coroutines.*
     ) {
         Log.d("SellFragment", "Amount: $amount, Tax: $tax, Tip: $tip, IAC: $iac")
 
+
+
       val result =  IntegrationClientSDK.getSmartPosInstance().startSell(
             context,
             amount,
@@ -324,14 +488,42 @@ import kotlinx.coroutines.*
             iac,
             "FkbUjU0=", // Se asume que "FkbUjU0=" es el hashCode por defecto
             firstParameter,
-            null,
+         null,
             this@TCService
         )
 
 
     }
 
+     private fun startSellQR(
+         context: Context,
+         amount: String,
+         tax: String,
+         tip: String,
+         iac: String,
+         firstParameter: String? = null
+     ) {
+         Log.d("SellFragment", "Amount: $amount, Tax: $tax, Tip: $tip, IAC: $iac")
+         val codeItem = "10203040"
+         val quantity = "1"
+         val unitValue = "150"
+         val subExtraInfo = SubExtraInfoDto(codeItem,quantity, unitValue, amount.toLong())
+         Log.d("SellFragment", "Amount:$subExtraInfo ")
 
+         val result =  IntegrationClientSDK.getSmartPosInstance().startSellQR(
+             context,
+             amount,
+             tax,
+             tip,
+             iac,
+             "FkbUjU0=", // Se asume que "FkbUjU0=" es el hashCode por defecto
+             null,
+             null,
+             this@TCService
+         )
+
+
+     }
     suspend fun validarMA(idMedioAcceso: String): TCard = withContext(Dispatchers.IO) {
         // Obtener el token de autenticación
         val username = "pruebas@kapi.com.co"
@@ -346,7 +538,7 @@ import kotlinx.coroutines.*
     """.trimIndent()
 
         try {
-            val url = URL("https://webpos.kapi.com.co/sonda/validar-ma-test")
+            val url = URL("https://webpos.kapi.com.co/sonda/validar-ma")
             val connection = url.openConnection() as HttpURLConnection
             connection.requestMethod = "POST"
             connection.setRequestProperty("Content-Type", "application/json")
@@ -425,12 +617,12 @@ import kotlinx.coroutines.*
         val username = "pruebas@kapi.com.co"
         val password = "yF7t22k1ZE53"
         val cookie = authenticateAndGetCookie(username, password)
-        val sondaUrl = URI.create("https://webpos.kapi.com.co/sonda/saldo-abt-test")
+        val sondaUrl = URI.create("https://webpos.kapi.com.co/sonda/saldo-abt")
         return try {
             val sondaData = """
         {
           "user_id": 0,
-          "transaction_name": "SON_VALIDATION_MA",
+          "transaction_name": "SON_AMOUNTS_ABT",
           "uid_externo": "$uidExterno",
           "uid_interno": "$uidInterno",
           "status": "PENDING",
@@ -491,7 +683,7 @@ import kotlinx.coroutines.*
     """.trimIndent()
 
         try {
-            val url = URL("https://webpos.kapi.com.co/sonda/consultar_saldo_test")
+            val url = URL("https://webpos.kapi.com.co/sonda/consultar_saldo")
             val connection = url.openConnection() as HttpURLConnection
             connection.requestMethod = "POST"
             connection.setRequestProperty("Content-Type", "application/json")
@@ -560,19 +752,42 @@ import kotlinx.coroutines.*
 
      suspend fun completarCompraTC(id_trx_tef: Int): String = withContext(Dispatchers.IO) {
          // Obtener el token de autenticación
+         setUltimoIdTransaccion(id_trx_tef)
          val username = "pruebas@kapi.com.co"
          val password = "yF7t22k1ZE53"
          val cookie = authenticateAndGetCookie(username, password)
 
          // Crear el cuerpo de la solicitud
+
+
+         /***
+          *   "id_trx_n86": 0,
+          *   "codigo_aprobacion": "string",
+          *   "fecha_transaccion": "string", en formato MMDD
+          *   "hora_transaccion": "string", en formato HHMM
+          *   "franquicia": "string",
+          *   "numero_cuotas": 0,
+          *   "ultimos_digitos_tarjeta": "string",
+          *   "bin_tarjeta": "string"
+          *
+          */
          val requestBody = """
         {
-            "id_trx_tef": "$id_trx_tef"
+          
+             "id_trx_n86": $id_trx_tef,
+             "codigo_aprobacion": "$id_trx_tef",
+            "fecha_transaccion": "0607",
+             "hora_transaccion": "1550",
+             "franquicia": "VISA",
+             "numero_cuotas": 3,
+             "ultimos_digitos_tarjeta": "1878",
+             "bin_tarjeta": "12345"
+            
         }
     """.trimIndent()
 
          try {
-             val url = URL("https://webpos.kapi.com.co/n86/completar-compra-tc-tef")
+             val url = URL("https://webpos.kapi.com.co/n86/completar-compra-tc")
              val connection = url.openConnection() as HttpURLConnection
              connection.requestMethod = "POST"
              connection.setRequestProperty("Content-Type", "application/json")
@@ -630,7 +845,7 @@ import kotlinx.coroutines.*
         val requestBody = """
         {
           "user_id": 0,
-          "transaction_name": "SON_VALIDATION_MA",
+          "transaction_name": "SON_AMOUNTS_ABT",
           "uid_externo": "$uidExterno",
           "uid_interno": "$uidInterno",
           "status": "PENDING",
@@ -644,7 +859,7 @@ import kotlinx.coroutines.*
 
         try {
             // Llamar a makeHttpRequest con la URL y el cuerpo de la solicitud
-            val jsonResponse = makeHttpRequest("https://webpos.kapi.com.co/n86/crear-compra-tc-tef", requestBody)
+            val jsonResponse = makeHttpRequest("https://webpos.kapi.com.co/n86/crear-compra-tc", requestBody)
             val idFactura = jsonResponse.get("ID_Factura")?.toString() ?: ""
             val idTransaccion = jsonResponse.get("ID_Transaccion")?.toString() ?: ""
             // Imprimir los valores de ID_Factura e ID_Transaccion (puedes eliminar estos logs si no los necesitas)
@@ -737,6 +952,71 @@ import kotlinx.coroutines.*
              throw IOException("Error en la solicitud: ${e.message}")
          }
      }
+
+     suspend fun enviarMensaje(newTransactionId: Int, phoneNumber: String): String = withContext(Dispatchers.IO) {
+         // Obtener el token de autenticación (simulado con credenciales en el código)
+         val username = "pruebas@kapi.com.co"
+         val password = "yF7t22k1ZE53"
+         val cookie = authenticateAndGetCookie(username, password)
+
+         // Crear el cuerpo de la solicitud para enviar el SMS
+         val requestBody = """
+        {
+            "smsNumber": "$phoneNumber",
+            "newTransactionId": $newTransactionId
+        }
+    """.trimIndent()
+
+         try {
+             val url = URL("https://webpos.kapi.com.co/sns/sms")
+             val connection = url.openConnection() as HttpURLConnection
+             connection.requestMethod = "POST"
+             connection.setRequestProperty("Content-Type", "application/json")
+             connection.setRequestProperty("Cookie", cookie)
+             connection.doOutput = true
+
+             val outputStream = connection.outputStream
+             outputStream.write(requestBody.toByteArray())
+             outputStream.close()
+
+             val responseCode = connection.responseCode
+             Log.d("enviarMensaje", "Response Code: $responseCode")
+
+             if (responseCode == HttpURLConnection.HTTP_OK) {
+                 val responseStream = connection.inputStream
+                 val responseReader = BufferedReader(InputStreamReader(responseStream))
+                 val responseStringBuilder = StringBuilder()
+
+                 var line: String?
+                 while (responseReader.readLine().also { line = it } != null) {
+                     responseStringBuilder.append(line)
+                 }
+
+                 responseReader.close()
+                 clearUltimoIdTransaccion()
+                 val responseData = responseStringBuilder.toString()
+                 connection.disconnect()
+
+                 // Parsear la respuesta JSON si es necesario
+                 // Aquí puedes procesar la respuesta según lo que necesites
+                 val mensajeExito = "Mensaje enviado"
+
+                 return@withContext mensajeExito
+             } else {
+                 // Si no se recibe una respuesta HTTP_OK, devolver un mensaje de error
+                 val errorMessage = "Error al enviar el mensaje. Código de respuesta: $responseCode"
+                 Log.e("enviarMensaje", errorMessage)
+                 setUltimoMessage(errorMessage)
+                 return@withContext errorMessage
+             }
+         } catch (e: Exception) {
+             Log.e("enviarMensaje", "Error: ${e.message}")
+             setUltimoMessage("Error")
+             // Manejo de errores: lanzar una excepción para que el cliente pueda manejarla
+             throw IOException("Error en la solicitud: ${e.message}")
+         }
+     }
+
 
      suspend fun makeHttpRequest(urlString: String, requestBody: ByteArray): JsonObject {
         // Obtener el token de autenticación

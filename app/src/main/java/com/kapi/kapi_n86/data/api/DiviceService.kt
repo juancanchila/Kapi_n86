@@ -122,11 +122,9 @@ class DeviceService(private val context: Context) : ResultIntegrationSDK {
         val grayLevel = GRAY_LEVEL_2 // Nivel de gris predeterminado
         val hashCode = "FkbUjU0=" // Código de hash necesario para la operación, asegúrate de proporcionarlo
         // Lista de valores aleatorios para enviar
-        valuesToSend.add("Hola MUndo")
+        valuesToSend.add("$TEXT,\"Hola MUndo\",$FONT_BIG,$ALIGN_RIGHT")
         // Agregar valores aleatorios a la lista
-        repeat(10) {
-            valuesToSend.add("Valor_$it") // Ajusta el formato o contenido según sea necesario
-        }
+
         // Imprimir las líneas de texto
         IntegrationPeripherialSDK.getSmartPosInstancePeripherals().starPrint(
             context,

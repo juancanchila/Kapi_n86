@@ -29,7 +29,7 @@ class MainActivity : ComponentActivity() {
                 val navController = rememberNavController()
                 NavHost(navController = navController, startDestination = "login") {
                     composable("login") { LoginForm(navController, authenticationService) }
-                    composable("home") { HomePage(navController, authenticationService) }
+                    composable("home") { HomePage(navController, authenticationService,tcService) }
                     composable("recargasTC") { Recargas_TC(navController, tcService) }
                     composable("perfil") { ProfileView(navController, authenticationService) }
                     composable("reporteDeVentas") { TotalsScreen(navController, authenticationService ,tcService) }

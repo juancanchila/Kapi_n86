@@ -22,6 +22,8 @@ import kotlinx.serialization.json.JsonObject
 class MyViewModel : ViewModel() {
 
 }
+
+
 @Composable
 fun MediosDePagos(
     navController: NavController,
@@ -36,6 +38,8 @@ fun MediosDePagos(
     val mostrarDialogoError = remember { mutableStateOf(false) }
     val mensajeError = remember { mutableStateOf("") }
     val mostrarPopUp = remember { mutableStateOf(false) }
+    val mostrarPopUpNum = remember { mutableStateOf(false) }
+
 
     fun onClickEfectivo() {
         viewModel.viewModelScope.launch {
@@ -68,13 +72,43 @@ fun MediosDePagos(
         }
     }
 
+    fun onClickQR() {
+        viewModel.viewModelScope.launch {
+            try {
+                mostrarDialogoCarga.value = true
+                val resultadoRecarga: String? = tcService.recargaQR(uid, uidInterno, valorRecarga.toInt()).await()
+                 val saldo = tcService.consultarSaldo(uid.toString())
+
+                Log.d("RecargasTC", "Resultado recarga débito: $resultadoRecarga")
+                mostrarDialogoCarga.value = false
+
+                if (resultadoRecarga == "0") {
+                    // Recarga exitosa
+                    val mensaje = "Recarga exitosa. Nuevo saldo: $saldo, Tarjeta: $uid"
+                    mensajeError.value = mensaje
+                    mostrarPopUp.value = true
+
+                } else {
+                    // Recarga fallida
+                    mensajeError.value = "Error al realizar la recarga: $resultadoRecarga"
+                    mostrarDialogoError.value = true
+                }
+            } catch (e: Exception) {
+                // Error durante la recarga
+                mensajeError.value = "Error al realizar la recarga: ${e.message}"
+                mostrarDialogoError.value = true
+            } finally {
+                mostrarDialogoCarga.value = false
+            }
+        }
+    }
     fun onClickDebito() {
         viewModel.viewModelScope.launch {
             try {
                 mostrarDialogoCarga.value = true
                 val resultadoRecarga: String? = tcService.recargaDV(uid, uidInterno, valorRecarga.toInt()).await()
-               // val saldo = tcService.consultarSaldo(uid.toString())
-                val saldo = 0
+                val saldo = tcService.consultarSaldo(uid.toString())
+
                     Log.d("RecargasTC", "Resultado recarga débito: $resultadoRecarga")
                 mostrarDialogoCarga.value = false
 
@@ -102,15 +136,19 @@ fun MediosDePagos(
     fun onClickCredito() {
         viewModel.viewModelScope.launch {
             try {
+                mostrarPopUpNum.value = true
                 mostrarDialogoCarga.value = true
                 val resultadoRecarga: String? = tcService.recargaTC(uid, uidInterno, valorRecarga.toInt()).await()
                 Log.d("RecargasTC", "Resultado recarga crédito: $resultadoRecarga")
                 mostrarDialogoCarga.value = false
-                // val saldo = tcService.consultarSaldo(uid.toString())
-                val saldo = 0
+
+                 val saldo = tcService.consultarSaldo(uid.toString())
+
                 if (resultadoRecarga == "0") {
 
                         val mensaje = "Recarga exitosa. Nuevo saldo: $saldo, Tarjeta: $uid"
+
+
                         mensajeError.value = mensaje
                         mostrarPopUp.value = true
 
@@ -130,10 +168,7 @@ fun MediosDePagos(
         }
     }
 
-    fun onClickQR() {
 
-
-        }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -230,6 +265,8 @@ fun MediosDePagos(
             }
         }
     }
+
+
 
     if (mostrarDialogoError.value) {
         AlertDialog(

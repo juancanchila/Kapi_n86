@@ -1,6 +1,8 @@
 package com.kapi.kapi_n86.ui.recargas_tc
 
+import android.content.Context
 import android.util.Log
+import android.widget.EditText
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -64,8 +66,11 @@ fun Recargas_TC(navController: NavController, tcService: TCService, onBackClicke
     val keyboardController = LocalSoftwareKeyboardController.current
     val coroutineScope = rememberCoroutineScope()
     var showErrorDialog by remember { mutableStateOf(false) }
+    var showErrorDialog_max by remember { mutableStateOf(false) }
     var fixedNumber by remember { mutableStateOf<String?>(null) }
     var otroValorEnviar by remember { mutableStateOf(0) }
+    var showValueErrorDialog by remember { mutableStateOf(false) }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -95,7 +100,9 @@ fun Recargas_TC(navController: NavController, tcService: TCService, onBackClicke
                 modifier = Modifier.fillMaxWidth()
             )
 
+
             Spacer(modifier = Modifier.height(8.dp))
+
 
             Button(
                 onClick = {
@@ -143,9 +150,12 @@ fun Recargas_TC(navController: NavController, tcService: TCService, onBackClicke
             Spacer(modifier = Modifier.height(8.dp))
 
             if (mostrarResultado) {
+
+
                 Text("UID: $resultadoNid")
                 Text("Saldo: $saldo")
                 val recargaMinimaCalculada = if (saldo.toInt() >= 3000) 100 else ((3000 - saldo.toInt()) + 99) / 100 * 100
+
                 Text(
                     text = "Recarga mínima: ${
                         // Aplicar formato de moneda colombiana (COP)
@@ -205,7 +215,15 @@ fun Recargas_TC(navController: NavController, tcService: TCService, onBackClicke
                         onDone = {
                             keyboardController?.hide()
                             // No necesitas formatear aquí, simplemente guarda el valor entero
-                            otroValorEnviar = otroValor.toIntOrNull() ?: 0 // Si no se puede convertir, asigna 0 como valor predeterminado
+                           // otroValorEnviar = otroValor.toIntOrNull() ?: 0 // Si no se puede convertir, asigna 0 como valor predeterminado
+
+                            val valorIngresado = otroValor.toIntOrNull() ?: 0
+                            if (valorIngresado < 99) {
+                                showValueErrorDialog = true
+                                mostrarBotonRecargar = false
+                            } else {
+                                otroValorEnviar = valorIngresado
+                            }
                         }
                     ),
                     modifier = Modifier.fillMaxWidth()
@@ -231,7 +249,17 @@ fun Recargas_TC(navController: NavController, tcService: TCService, onBackClicke
                         val recargaInfo = RecargaInfo( resultadoNid, valorRecarga, recargaSeleccionada)
                         println("Recarga Info: $recargaInfo")
                         // Navegar a la siguiente pantalla con el objeto recargaInfo
-                        navController.navigate("mediosDePago/$resultadoNid/$valorRecarga/$recargaSeleccionada/$uidInterno")
+
+                      val sum_totals =   valorRecarga + saldo.toInt()
+                        Log.d("consultarSaldo", "Caluclar nuevo saldo: $sum_totals")
+
+
+                        if(sum_totals < 120000) {
+                            navController.navigate("mediosDePago/$resultadoNid/$valorRecarga/$recargaSeleccionada/$uidInterno")
+                        }else {
+                            showErrorDialog_max = true
+                        }
+
 
                     } else {
                         showErrorDialog = true
@@ -245,6 +273,33 @@ fun Recargas_TC(navController: NavController, tcService: TCService, onBackClicke
             }
         }
 
+        if (showValueErrorDialog) {
+            AlertDialog(
+                onDismissRequest = {
+                    showValueErrorDialog = false
+                },
+                title = {
+                    Text(text = "Error")
+                },
+                text = {
+                    Text("El valor mínimo para recargar es 100.")
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showValueErrorDialog = false
+                        }
+                    ) {
+                        Text("Aceptar")
+                    }
+                }
+            )
+        }
+
+
+
+
+
         if (showErrorDialog) {
             AlertDialog(
                 onDismissRequest = {
@@ -254,7 +309,7 @@ fun Recargas_TC(navController: NavController, tcService: TCService, onBackClicke
                     Text(text = "Error")
                 },
                 text = {
-                    Text("Por favor, ingrese el UID y seleccione una cantidad de recarga.")
+                    Text("Por favor, ingrese el UID y seleccione una cantidad de recarga sobre los 100 pesos")
                 },
                 confirmButton = {
                     Button(
@@ -267,6 +322,32 @@ fun Recargas_TC(navController: NavController, tcService: TCService, onBackClicke
                 }
             )
         }
+
+        if (showErrorDialog_max) {
+            AlertDialog(
+                onDismissRequest = {
+                    showErrorDialog_max = false
+                },
+                title = {
+                    Text(text = "Error")
+                },
+                text = {
+                    Text("Su saldo no puede superar 120.000 COP")
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showErrorDialog_max = false
+                        }
+                    ) {
+                        Text("Aceptar")
+                    }
+                }
+            )
+        }
+
+
+
     }
 }
 
